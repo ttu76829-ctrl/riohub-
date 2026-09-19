@@ -1,8 +1,3 @@
-loadstring(game:HttpGet("https://gist.githubusercontent.com/ttu76829-ctrl/d023ae39f6529070dba6264753fa6a7d/raw/4e572d432d0f13eedbc251fdf8de74ec857893e3/riohammer"))()
-
-loadstring(game:HttpGet("https://gist.githubusercontent.com/ttu76829-ctrl/d023ae39f6529070dba6264753fa6a7d/raw/87fe6c622088ebd1ab8d5b2c91a0c3d0fa93437c/tuandepkakaka"))()
-
-
 -- LocalScript đặt tại: StarterPlayer -> StarterPlayerScripts -> RioHubScript
 local Players = game:GetService("Players")
 local UserInputService = game:GetService("UserInputService")
