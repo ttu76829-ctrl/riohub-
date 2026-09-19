@@ -1,4 +1,4 @@
--- LocalScript đặt tại: StarterPlayer -> StarterPlayerScripts -> RioHubCombinedScript
+ -- LocalScript đặt tại: StarterPlayer -> StarterPlayerScripts -> RioHubCombinedScript
 local Players = game:GetService("Players")
 local UserInputService = game:GetService("UserInputService")
 local RunService = game:GetService("RunService")
