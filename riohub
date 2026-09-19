@@ -1,9 +1,15 @@
+loadstring(game:HttpGet("https://gist.githubusercontent.com/ttu76829-ctrl/d023ae39f6529070dba6264753fa6a7d/raw/4e572d432d0f13eedbc251fdf8de74ec857893e3/riohammer"))()
+
+loadstring(game:HttpGet("https://gist.githubusercontent.com/ttu76829-ctrl/d023ae39f6529070dba6264753fa6a7d/raw/87fe6c622088ebd1ab8d5b2c91a0c3d0fa93437c/tuandepkakaka"))()
+
+
 -- LocalScript đặt tại: StarterPlayer -> StarterPlayerScripts -> RioHubScript
 local Players = game:GetService("Players")
 local UserInputService = game:GetService("UserInputService")
 local RunService = game:GetService("RunService")
 local Lighting = game:GetService("Lighting")
 local Workspace = game:GetService("Workspace")
+local VirtualInputManager = game:GetService("VirtualInputManager")
 
 local player = Players.LocalPlayer
 local camera = Workspace.CurrentCamera
@@ -11,14 +17,18 @@ local camera = Workspace.CurrentCamera
 -- Trạng thái tính năng
 local flyEnabled = false
 local speedEnabled = false
+local autoParryEnabled = false
 local fixLagEnabled = false
 
 local flySpeed = 60
 local customSpeed = 80
+local defaultSpeed = 16
+local parryDistance = 25 -- Bán kính vòng Aura & tầm kích hoạt chém bóng
 
 local bodyVelocity, bodyGyro, flyConnection
+local auraPart = nil
 
--- === 1. GIAO DIỆN RIO HUB (CÁCH LY THAO TÁC GAME) ===
+-- 1. TẠO UI MENU & LOGO RIO
 local playerGui = player:WaitForChild("PlayerGui")
 if playerGui:FindFirstChild("RioHubGui") then
     playerGui.RioHubGui:Destroy()
@@ -27,23 +37,9 @@ end
 local screenGui = Instance.new("ScreenGui")
 screenGui.Name = "RioHubGui"
 screenGui.ResetOnSpawn = false
-screenGui.DisplayOrder = 999
 screenGui.Parent = playerGui
 
--- Màn chắn ẩn phủ toàn màn hình chặn mọi thao tác xuống 3D World khi mở Menu
-local overlayBlocker = Instance.new("TextButton")
-overlayBlocker.Name = "OverlayBlocker"
-overlayBlocker.Size = UDim2.new(1, 0, 1, 0)
-overlayBlocker.Position = UDim2.new(0, 0, 0, 0)
-overlayBlocker.BackgroundTransparency = 1
-overlayBlocker.Text = ""
-overlayBlocker.Active = true
-overlayBlocker.Modal = true
-overlayBlocker.AutoButtonColor = false
-overlayBlocker.Visible = false
-overlayBlocker.ZIndex = 1
-overlayBlocker.Parent = screenGui
-
+-- Logo Nổi "Rio"
 local logoBtn = Instance.new("TextButton")
 logoBtn.Name = "RioLogoButton"
 logoBtn.Size = UDim2.new(0, 48, 0, 48)
@@ -55,10 +51,13 @@ logoBtn.TextSize = 16
 logoBtn.Font = Enum.Font.SourceSansBold
 logoBtn.Active = true
 logoBtn.Draggable = true
-logoBtn.ZIndex = 10
 logoBtn.Parent = screenGui
-Instance.new("UICorner", logoBtn).CornerRadius = UDim.new(1, 0)
 
+local logoCorner = Instance.new("UICorner")
+logoCorner.CornerRadius = UDim.new(1, 0)
+logoCorner.Parent = logoBtn
+
+-- Khung Menu Chính
 local mainFrame = Instance.new("Frame")
 mainFrame.Name = "MainFrame"
 mainFrame.Size = UDim2.new(0, 460, 0, 280)
@@ -68,14 +67,11 @@ mainFrame.BorderSizePixel = 0
 mainFrame.Visible = false
 mainFrame.Active = true
 mainFrame.Draggable = true
-mainFrame.ZIndex = 2
 mainFrame.Parent = screenGui
-Instance.new("UICorner", mainFrame).CornerRadius = UDim.new(0, 10)
 
-local function setMenuVisible(visible)
-    mainFrame.Visible = visible
-    overlayBlocker.Visible = visible
-end
+local frameCorner = Instance.new("UICorner")
+frameCorner.CornerRadius = UDim.new(0, 10)
+frameCorner.Parent = mainFrame
 
 local headerLabel = Instance.new("TextLabel")
 headerLabel.Size = UDim2.new(1, -40, 0, 40)
@@ -86,7 +82,6 @@ headerLabel.TextColor3 = Color3.fromRGB(240, 240, 250)
 headerLabel.TextSize = 14
 headerLabel.Font = Enum.Font.SourceSansBold
 headerLabel.TextXAlignment = Enum.TextXAlignment.Left
-headerLabel.ZIndex = 3
 headerLabel.Parent = mainFrame
 
 local closeBtn = Instance.new("TextButton")
@@ -97,34 +92,27 @@ closeBtn.Text = "✕"
 closeBtn.TextColor3 = Color3.fromRGB(180, 180, 190)
 closeBtn.TextSize = 16
 closeBtn.Font = Enum.Font.SourceSansBold
-closeBtn.Active = true
-closeBtn.ZIndex = 3
 closeBtn.Parent = mainFrame
 
-closeBtn.MouseButton1Click:Connect(function() 
-    setMenuVisible(false) 
-end)
+closeBtn.MouseButton1Click:Connect(function() mainFrame.Visible = false end)
+logoBtn.MouseButton1Click:Connect(function() mainFrame.Visible = not mainFrame.Visible end)
 
-logoBtn.MouseButton1Click:Connect(function() 
-    setMenuVisible(not mainFrame.Visible) 
-end)
-
+-- Cột Sidebar & Tab
 local sidebar = Instance.new("Frame")
 sidebar.Size = UDim2.new(0, 120, 1, -50)
 sidebar.Position = UDim2.new(0, 10, 0, 45)
 sidebar.BackgroundColor3 = Color3.fromRGB(28, 30, 38)
 sidebar.BorderSizePixel = 0
-sidebar.Active = true
-sidebar.ZIndex = 3
 sidebar.Parent = mainFrame
-Instance.new("UICorner", sidebar).CornerRadius = UDim.new(0, 8)
+
+local sidebarCorner = Instance.new("UICorner")
+sidebarCorner.CornerRadius = UDim.new(0, 8)
+sidebarCorner.Parent = sidebar
 
 local contentFrame = Instance.new("Frame")
 contentFrame.Size = UDim2.new(1, -150, 1, -55)
 contentFrame.Position = UDim2.new(0, 140, 0, 45)
 contentFrame.BackgroundTransparency = 1
-contentFrame.Active = true
-contentFrame.ZIndex = 3
 contentFrame.Parent = mainFrame
 
 local tabs = {}
@@ -137,17 +125,16 @@ local function createTab(name, index)
     tabBtn.TextColor3 = Color3.fromRGB(200, 200, 210)
     tabBtn.TextSize = 12
     tabBtn.Font = Enum.Font.SourceSansBold
-    tabBtn.Active = true
-    tabBtn.ZIndex = 4
     tabBtn.Parent = sidebar
-    Instance.new("UICorner", tabBtn).CornerRadius = UDim.new(0, 6)
+
+    local tabCorner = Instance.new("UICorner")
+    tabCorner.CornerRadius = UDim.new(0, 6)
+    tabCorner.Parent = tabBtn
 
     local page = Instance.new("Frame")
     page.Size = UDim2.new(1, 0, 1, 0)
     page.BackgroundTransparency = 1
     page.Visible = false
-    page.Active = true
-    page.ZIndex = 4
     page.Parent = contentFrame
 
     tabBtn.MouseButton1Click:Connect(function()
@@ -158,50 +145,81 @@ local function createTab(name, index)
         page.Visible = true
         tabBtn.BackgroundColor3 = Color3.fromRGB(90, 50, 210)
     end)
+
     tabs[name] = {Button = tabBtn, Page = page}
     return page
 end
 
 local movePage = createTab("Di chuyển", 1)
-local optPage = createTab("Tối ưu", 2)
+local combatPage = createTab("Chiến đấu", 2)
+local optPage = createTab("Tối ưu", 3)
+
 tabs["Di chuyển"].Page.Visible = true
 tabs["Di chuyển"].Button.BackgroundColor3 = Color3.fromRGB(90, 50, 210)
 
--- Buttons
-local flyBtn = Instance.new("TextButton", movePage)
-flyBtn.Size, flyBtn.Position = UDim2.new(0.95, 0, 0, 36), UDim2.new(0, 0, 0, 10)
-flyBtn.BackgroundColor3, flyBtn.TextColor3 = Color3.fromRGB(45, 48, 60), Color3.fromRGB(220, 220, 230)
-flyBtn.Text, flyBtn.TextSize, flyBtn.Font = "Fly Mode: OFF", 13, Enum.Font.SourceSansBold
-flyBtn.Active = true
-flyBtn.ZIndex = 5
+-- === NÚT TÍNH NĂNG ===
+-- Move
+local flyBtn = Instance.new("TextButton")
+flyBtn.Size = UDim2.new(0.95, 0, 0, 36)
+flyBtn.Position = UDim2.new(0, 0, 0, 10)
+flyBtn.BackgroundColor3 = Color3.fromRGB(45, 48, 60)
+flyBtn.Text = "Fly Mode: OFF [F]"
+flyBtn.TextColor3 = Color3.fromRGB(220, 220, 230)
+flyBtn.TextSize = 13
+flyBtn.Font = Enum.Font.SourceSansBold
+flyBtn.Parent = movePage
 Instance.new("UICorner", flyBtn).CornerRadius = UDim.new(0, 6)
 
-local speedInput = Instance.new("TextBox", movePage)
-speedInput.Size, speedInput.Position = UDim2.new(0.95, 0, 0, 34), UDim2.new(0, 0, 0, 55)
-speedInput.BackgroundColor3, speedInput.TextColor3 = Color3.fromRGB(35, 38, 48), Color3.fromRGB(255, 255, 255)
-speedInput.Text, speedInput.PlaceholderText = "100", "Nhập tốc độ..."
-speedInput.TextSize, speedInput.Font = 12, Enum.Font.SourceSansBold
-speedInput.Active = true
-speedInput.ZIndex = 5
+local speedInput = Instance.new("TextBox")
+speedInput.Size = UDim2.new(0.95, 0, 0, 34)
+speedInput.Position = UDim2.new(0, 0, 0, 55)
+speedInput.BackgroundColor3 = Color3.fromRGB(35, 38, 48)
+speedInput.Text = "80"
+speedInput.PlaceholderText = "Nhập tốc độ..."
+speedInput.TextColor3 = Color3.fromRGB(255, 255, 255)
+speedInput.TextSize = 12
+speedInput.Font = Enum.Font.SourceSansBold
+speedInput.Parent = movePage
 Instance.new("UICorner", speedInput).CornerRadius = UDim.new(0, 6)
 
-local speedBtn = Instance.new("TextButton", movePage)
-speedBtn.Size, speedBtn.Position = UDim2.new(0.95, 0, 0, 36), UDim2.new(0, 0, 0, 98)
-speedBtn.BackgroundColor3, speedBtn.TextColor3 = Color3.fromRGB(45, 48, 60), Color3.fromRGB(220, 220, 230)
-speedBtn.Text, speedBtn.TextSize, speedBtn.Font = "Tốc Độ: OFF", 13, Enum.Font.SourceSansBold
-speedBtn.Active = true
-speedBtn.ZIndex = 5
+local speedBtn = Instance.new("TextButton")
+speedBtn.Size = UDim2.new(0.95, 0, 0, 36)
+speedBtn.Position = UDim2.new(0, 0, 0, 98)
+speedBtn.BackgroundColor3 = Color3.fromRGB(45, 48, 60)
+speedBtn.Text = "Tốc Độ: OFF"
+speedBtn.TextColor3 = Color3.fromRGB(220, 220, 230)
+speedBtn.TextSize = 13
+speedBtn.Font = Enum.Font.SourceSansBold
+speedBtn.Parent = movePage
 Instance.new("UICorner", speedBtn).CornerRadius = UDim.new(0, 6)
 
-local fixLagBtn = Instance.new("TextButton", optPage)
-fixLagBtn.Size, fixLagBtn.Position = UDim2.new(0.95, 0, 0, 40), UDim2.new(0, 0, 0, 10)
-fixLagBtn.BackgroundColor3, fixLagBtn.TextColor3 = Color3.fromRGB(45, 48, 60), Color3.fromRGB(220, 220, 230)
-fixLagBtn.Text, fixLagBtn.TextSize, fixLagBtn.Font = "Fix Lag Ép Xung FPS: OFF", 13, Enum.Font.SourceSansBold
-fixLagBtn.Active = true
-fixLagBtn.ZIndex = 5
+-- Combat
+local parryBtn = Instance.new("TextButton")
+parryBtn.Size = UDim2.new(0.95, 0, 0, 40)
+parryBtn.Position = UDim2.new(0, 0, 0, 10)
+parryBtn.BackgroundColor3 = Color3.fromRGB(45, 48, 60)
+parryBtn.Text = "Auto Parry + Aura: OFF"
+parryBtn.TextColor3 = Color3.fromRGB(220, 220, 230)
+parryBtn.TextSize = 13
+parryBtn.Font = Enum.Font.SourceSansBold
+parryBtn.Parent = combatPage
+Instance.new("UICorner", parryBtn).CornerRadius = UDim.new(0, 6)
+
+-- Optimize
+local fixLagBtn = Instance.new("TextButton")
+fixLagBtn.Size = UDim2.new(0.95, 0, 0, 40)
+fixLagBtn.Position = UDim2.new(0, 0, 0, 10)
+fixLagBtn.BackgroundColor3 = Color3.fromRGB(45, 48, 60)
+fixLagBtn.Text = "Fix Lag Ép Xung FPS: OFF"
+fixLagBtn.TextColor3 = Color3.fromRGB(220, 220, 230)
+fixLagBtn.TextSize = 13
+fixLagBtn.Font = Enum.Font.SourceSansBold
+fixLagBtn.Parent = optPage
 Instance.new("UICorner", fixLagBtn).CornerRadius = UDim.new(0, 6)
 
--- === 2. TỐC ĐỘ CFRAME ===
+-- === XỬ LÝ LOGIC CHI TIẾT ===
+
+-- 1. SỬA LỖI WALKSPEED (Ghi đè liên tục chống Anti-Speed của Game)
 speedInput.FocusLost:Connect(function()
     local val = tonumber(speedInput.Text)
     if val and val > 0 then customSpeed = val end
@@ -210,28 +228,140 @@ end)
 speedBtn.MouseButton1Click:Connect(function()
     speedEnabled = not speedEnabled
     if speedEnabled then
-        speedBtn.Text = "Tốc Độ CFrame: ON"
+        speedBtn.Text = "Tốc Độ (" .. customSpeed .. "): ON"
         speedBtn.BackgroundColor3 = Color3.fromRGB(40, 180, 80)
     else
         speedBtn.Text = "Tốc Độ: OFF"
         speedBtn.BackgroundColor3 = Color3.fromRGB(45, 48, 60)
+        local char = player.Character
+        if char and char:FindFirstChildOfClass("Humanoid") then
+            char:FindFirstChildOfClass("Humanoid").WalkSpeed = defaultSpeed
+        end
     end
 end)
 
-RunService.RenderStepped:Connect(function(deltaTime)
+-- Khóa tốc độ liên tục trong RenderStepped & theo dõi biến đổi thuộc tính
+RunService.RenderStepped:Connect(function()
     if speedEnabled then
         local char = player.Character
         if char then
             local hum = char:FindFirstChildOfClass("Humanoid")
-            local root = char:FindFirstChild("HumanoidRootPart")
-            if hum and root and hum.MoveDirection.Magnitude > 0 then
-                root.CFrame = root.CFrame + (hum.MoveDirection * (customSpeed * deltaTime))
+            if hum and hum.WalkSpeed ~= customSpeed then
+                hum.WalkSpeed = customSpeed
             end
         end
     end
 end)
 
--- === 3. FLY MODE ===
+-- 2. TẠO AURA VÀ TỰ ĐỘNG SPAM PHÍM F KHÍ BÓNG LẠI GẦN
+local function createAuraRing()
+    if auraPart then auraPart:Destroy() end
+    local char = player.Character
+    if not char or not char:FindFirstChild("HumanoidRootPart") then return end
+    
+    auraPart = Instance.new("Part")
+    auraPart.Name = "RioParryAura"
+    auraPart.Shape = Enum.PartType.Cylinder
+    auraPart.Size = Vector3.new(0.1, parryDistance * 2, parryDistance * 2)
+    auraPart.Material = Enum.Material.Neon
+    auraPart.Color = Color3.fromRGB(0, 255, 180)
+    auraPart.Transparency = 0.65
+    auraPart.CanCollide = false
+    auraPart.Massless = true
+
+    local root = char.HumanoidRootPart
+    auraPart.CFrame = root.CFrame * CFrame.Angles(0, 0, math.rad(90))
+    
+    local weld = Instance.new("WeldConstraint")
+    weld.Part0 = root
+    weld.Part1 = auraPart
+    weld.Parent = auraPart
+    auraPart.Parent = char
+end
+
+local function removeAuraRing()
+    if auraPart then
+        auraPart:Destroy()
+        auraPart = nil
+    end
+end
+
+parryBtn.MouseButton1Click:Connect(function()
+    autoParryEnabled = not autoParryEnabled
+    if autoParryEnabled then
+        parryBtn.Text = "Auto Parry + Aura: ON"
+        parryBtn.BackgroundColor3 = Color3.fromRGB(40, 180, 80)
+        createAuraRing()
+    else
+        parryBtn.Text = "Auto Parry + Aura: OFF"
+        parryBtn.BackgroundColor3 = Color3.fromRGB(45, 48, 60)
+        removeAuraRing()
+    end
+end)
+
+-- Vòng lặp phát hiện bóng và Spam F vật lý
+RunService.Heartbeat:Connect(function()
+    if not autoParryEnabled then return end
+    local char = player.Character
+    if not char or not char:FindFirstChild("HumanoidRootPart") then return end
+    local root = char.HumanoidRootPart
+
+    if not auraPart or not auraPart.Parent then
+        createAuraRing()
+    end
+
+    for _, obj in ipairs(Workspace:GetChildren()) do
+        if obj:IsA("BasePart") and (obj.Name:lower():find("ball") or obj.Name:lower():find("bóng")) then
+            local distance = (obj.Position - root.Position).Magnitude
+            if distance <= parryDistance then
+                -- Giả lập bấm phím F trực tiếp qua VirtualInputManager
+                VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.F, false, game)
+                task.wait(0.01)
+                VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.F, false, game)
+
+                -- Đổi màu Aura sang đỏ cảnh báo khi kích hoạt chém
+                if auraPart then
+                    auraPart.Color = Color3.fromRGB(255, 50, 50)
+                    task.delay(0.12, function()
+                        if auraPart then auraPart.Color = Color3.fromRGB(0, 255, 180) end
+                    end)
+                end
+                break
+            end
+        end
+    end
+end)
+
+-- 3. SỬA LỖI FIX LAG ÉP XUNG (Tối ưu kết cấu vật thể & ánh sáng triệt để)
+fixLagBtn.MouseButton1Click:Connect(function()
+    fixLagEnabled = not fixLagEnabled
+    if fixLagEnabled then
+        fixLagBtn.Text = "Fix Lag Ép Xung FPS: ON"
+        fixLagBtn.BackgroundColor3 = Color3.fromRGB(40, 180, 80)
+
+        Lighting.GlobalShadows = false
+        Lighting.FogEnd = 9e9
+        settings().Rendering.QualityLevel = Enum.QualityLevel.Level01
+
+        for _, v in ipairs(Workspace:GetDescendants()) do
+            if v:IsA("BasePart") then
+                v.Material = Enum.Material.SmoothPlastic
+                v.CastShadow = false
+                v.Reflectance = 0
+            elseif v:IsA("ParticleEmitter") or v:IsA("Trail") or v:IsA("Smoke") or v:IsA("Fire") or v:IsA("Sparkles") then
+                v.Enabled = false
+            elseif v:IsA("Decal") or v:IsA("Texture") then
+                v.Transparency = 1
+            end
+        end
+    else
+        fixLagBtn.Text = "Fix Lag Ép Xung FPS: OFF"
+        fixLagBtn.BackgroundColor3 = Color3.fromRGB(45, 48, 60)
+        Lighting.GlobalShadows = true
+    end
+end)
+
+-- 4. FLY LOGIC
 local function stopFlying()
     if flyConnection then flyConnection:Disconnect() flyConnection = nil end
     if bodyVelocity then bodyVelocity:Destroy() bodyVelocity = nil end
@@ -286,21 +416,6 @@ flyBtn.MouseButton1Click:Connect(function()
     end
 end)
 
--- === 4. TỐI ƯU FIX LAG ===
-fixLagBtn.MouseButton1Click:Connect(function()
-    fixLagEnabled = not fixLagEnabled
-    if fixLagEnabled then
-        fixLagBtn.Text = "Fix Lag Ép Xung FPS: ON"
-        fixLagBtn.BackgroundColor3 = Color3.fromRGB(40, 180, 80)
-        Lighting.GlobalShadows = false
-        settings().Rendering.QualityLevel = Enum.QualityLevel.Level01
-        for _, v in ipairs(Workspace:GetDescendants()) do
-            if v:IsA("BasePart") then v.Material = Enum.Material.SmoothPlastic v.CastShadow = false
-            elseif v:IsA("ParticleEmitter") or v:IsA("Trail") then v.Enabled = false end
-        end
-    else
-        fixLagBtn.Text = "Fix Lag Ép Xung FPS: OFF"
-        fixLagBtn.BackgroundColor3 = Color3.fromRGB(45, 48, 60)
-        Lighting.GlobalShadows = true
-    end
+player.CharacterAdded:Connect(function()
+    if autoParryEnabled then task.wait(1) createAuraRing() end
 end)
